@@ -1,0 +1,109 @@
+Private WithEvents olItems As Outlook.Items
+
+Private Sub Application_Startup()
+    Dim olNs As Outlook.NameSpace
+    Dim olFolder As Outlook.MAPIFolder
+    
+    Set olNs = Application.GetNamespace("MAPI")
+    ' Reemplaza "Bandeja de entrada" por el nombre de la carpeta que utilizas si es diferente
+    Set olFolder = olNs.GetDefaultFolder(olFolderInbox)
+    Set olItems = olFolder.Items
+    
+    ' Registrar inicio de la aplicación (Opcional)
+    Call LogEvent("Outlook Startup: Macro iniciada.")
+End Sub
+
+Private Sub olItems_ItemAdd(ByVal Item As Object)
+    On Error GoTo ErrorHandler
+    
+    Dim olMail As Outlook.MailItem
+    Dim olAttachment As Outlook.Attachment
+    Dim saveFolder As String
+    Dim originalFileName As String
+    Dim newFileName As String
+    Dim extension As String
+    Dim timeStamp As String
+    Dim baseFileName As String
+    
+    ' Especifica la carpeta donde deseas guardar los archivos
+    saveFolder = "D:\Users\lcontreras\Desktop\Excel diarios de OUTLOOK\"
+    ' Asegúrate de que la ruta termine con una barra invertida "\"
+    
+    ' Verifica si el elemento añadido es un correo electrónico
+    If TypeOf Item Is Outlook.MailItem Then
+        Set olMail = Item
+        
+        ' Filtrar correos por asunto
+        If InStr(1, olMail.Subject, "programa de Retiro de Pollo vivo", vbTextCompare) = 0 Then Exit Sub
+        ' Utilizamos vbTextCompare para que la comparación no distinga entre mayúsculas y minúsculas
+        
+        ' Registrar recepción de correo filtrado (Opcional)
+        Call LogEvent("Correo recibido: " & olMail.Subject)
+        
+        ' Itera a través de todos los adjuntos del correo
+        For Each olAttachment In olMail.Attachments
+            ' Obtiene la extensión del archivo adjunto
+            If InStrRev(olAttachment.fileName, ".") > 0 Then
+                extension = LCase(Mid(olAttachment.fileName, InStrRev(olAttachment.fileName, ".") + 1))
+            Else
+                extension = ""
+            End If
+            
+            ' Verifica si el adjunto es un archivo de Excel
+            If extension = "xlsx" Or extension = "xlsm" Or extension = "xlsb" Or extension = "xls" Then
+                ' Obtiene el nombre base del archivo sin la extensión
+                baseFileName = Left(olAttachment.fileName, InStrRev(olAttachment.fileName, ".") - 1)
+                
+                ' Genera una marca de tiempo en formato YYYYMMDD_HHMMSS
+                timeStamp = Format(Now, "yyyymmdd_HHMMSS")
+                
+                ' Define el nuevo nombre completo del archivo a guardar
+                newFileName = saveFolder & "programa_de_Retiro_de_Pollo_vivo" & "." & extension
+                
+                ' Guarda el archivo adjunto con el nuevo nombre en la carpeta especificada
+                olAttachment.SaveAsFile newFileName
+                
+                ' Registrar guardado de archivo (Opcional)
+                Call LogEvent("Archivo guardado: " & newFileName)
+                
+                ' Opcional: Mensaje de confirmación
+                MsgBox "Archivo guardado: " & newFileName, vbInformation
+            End If
+        Next olAttachment
+    End If
+    
+ProgramExit:
+    Exit Sub
+
+ErrorHandler:
+    Call LogEvent("Error " & Err.Number & ": " & Err.Description)
+    Resume ProgramExit
+End Sub
+
+Private Sub LogEvent(ByVal message As String)
+    Dim fso As Object
+    Dim ts As Object
+    Dim logFilePath As String
+    
+    ' Especifica la ruta del archivo de log
+    logFilePath = "D:\Users\lcontreras\Desktop\Excel diarios de OUTLOOK\OutlookMacroLog.txt"
+    
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Abre el archivo de log, crea uno nuevo si no existe
+    If Not fso.FileExists(logFilePath) Then
+        Set ts = fso.CreateTextFile(logFilePath, True)
+    Else
+        Set ts = fso.OpenTextFile(logFilePath, 8, True)
+    End If
+    
+    ' Escribe el mensaje con una marca de tiempo
+    ts.WriteLine Now & ": " & message
+    
+    ' Cierra el archivo
+    ts.Close
+    
+    ' Libera objetos
+    Set ts = Nothing
+    Set fso = Nothing
+End Sub
